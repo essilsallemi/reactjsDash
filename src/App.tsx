@@ -1,5 +1,6 @@
 import { Layout, Typography, Card, Space, Row, Col, Button, Avatar, Badge } from 'antd';
 import { MessageOutlined, DashboardOutlined, SettingOutlined, BellOutlined } from '@ant-design/icons';
+import Chatbot from './Chatbot';
 import './App.css';
 
 const { Header, Content } = Layout;
@@ -121,41 +122,14 @@ function App() {
               }}
               styles={{ 
                 body: { 
-                  padding: '16px', 
+                  padding: '0', 
                   height: 'calc(100% - 57px)',
                   display: 'flex',
                   flexDirection: 'column'
                 } 
               }}
             >
-              <div style={{ 
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-                textAlign: 'center',
-                color: '#8c8c8c'
-              }} className="chatbot-placeholder">
-                <MessageOutlined style={{ fontSize: '48px', color: '#d9d9d9', marginBottom: '16px' }} />
-                <Title level={4} style={{ color: '#8c8c8c', margin: '0 0 8px 0' }}>
-                  Chatbot Coming Soon
-                </Title>
-                <p style={{ margin: 0 }}>
-                  Your AI assistant will be available here to help you analyze the dashboard data and answer questions.
-                </p>
-                <Button 
-                  type="primary" 
-                  style={{ 
-                    marginTop: '16px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    border: 'none'
-                  }}
-                  disabled
-                >
-                  Coming Soon
-                </Button>
-              </div>
+              <Chatbot />
             </Card>
           </Col>
         </Row>
