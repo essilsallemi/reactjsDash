@@ -290,7 +290,7 @@ function App() {
                 borderRadius: '8px',
                 background: '#f8f9fa'
               }}>
-            <iframe title="testaudit" width="1140" height="541.25" src="https://app.powerbi.com/reportEmbed?reportId=6ac9f0dc-1c02-4339-b1aa-0ed86b91b49c&autoAuth=true&ctid=7af38bd4-da09-4cad-b870-0617a2df54d4" frameborder="0" allowFullScreen="true"/>
+            <iframe title="testaudit" width="1140" height="541.25" src="https://app.powerbi.com/reportEmbed?reportId=d1c45134-1fcc-4ded-b2c1-316a8b139d71&autoAuth=true&ctid=07fd52b9-f7b7-477a-bcca-3d87f125f9c2" frameborder="0" allowFullScreen="true"/>
               </div>
             </Card>
           </Col>
