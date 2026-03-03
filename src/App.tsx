@@ -1,11 +1,97 @@
-import { Layout, Typography, Card, Space, Row, Col, Button, Avatar, Badge } from 'antd';
-import { MessageOutlined, DashboardOutlined, SettingOutlined, BellOutlined } from '@ant-design/icons';
+import { Layout, Typography, Card, Space, Row, Col, Button, Avatar, Badge, Input, Spin, message } from 'antd';
+import { MessageOutlined, DashboardOutlined, SettingOutlined, BellOutlined, SendOutlined } from '@ant-design/icons';
+import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
 
+interface ChatMessage {
+  id: string;
+  type: 'user' | 'bot';
+  content: string;
+  timestamp: string;
+}
+
 function App() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    // Check if chatbot server is online
+    checkServerStatus();
+  }, []);
+
+  const checkServerStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:3004/health');
+      if (response.ok) {
+        setIsOnline(true);
+      }
+    } catch (error) {
+      setIsOnline(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!inputValue.trim() || !isOnline) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: inputValue,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:3004/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: inputValue })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const botMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          type: 'bot',
+          content: data.response,
+          timestamp: new Date().toLocaleTimeString()
+        };
+        setMessages(prev => [...prev, botMessage]);
+      } else {
+        message.error('Failed to send message');
+      }
+    } catch (error) {
+      message.error('Error connecting to chatbot');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
   return (
     <Layout style={{ 
       minHeight: '100vh', 
@@ -84,18 +170,7 @@ function App() {
                 borderRadius: '8px',
                 background: '#f8f9fa'
               }}>
-                <iframe
-                  title="audit"
-                  width="100%"
-                  height="100%"
-                  src="https://app.powerbi.com/reportEmbed?reportId=ca2dc115-9471-4f92-b69b-f225a3acc7d1&autoAuth=true&ctid=7af38bd4-da09-4cad-b870-0617a2df54d4"
-                  frameBorder="0"
-                  allowFullScreen={true}
-                  style={{
-                    border: 'none',
-                    borderRadius: '8px'
-                  }}
-                />
+             
               </div>
             </Card>
           </Col>
@@ -109,7 +184,7 @@ function App() {
                     <MessageOutlined style={{ color: '#667eea' }} />
                     <span>AI Assistant</span>
                   </div>
-                  <Badge status="processing" text="Online" />
+                  <Badge status={isOnline ? "processing" : "error"} text={isOnline ? "Online" : "Offline"} />
                 </div>
               }
               style={{ 
@@ -132,29 +207,95 @@ function App() {
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-                textAlign: 'center',
-                color: '#8c8c8c'
-              }} className="chatbot-placeholder">
-                <MessageOutlined style={{ fontSize: '48px', color: '#d9d9d9', marginBottom: '16px' }} />
-                <Title level={4} style={{ color: '#8c8c8c', margin: '0 0 8px 0' }}>
-                  Chatbot Coming Soon
-                </Title>
-                <p style={{ margin: 0 }}>
-                  Your AI assistant will be available here to help you analyze the dashboard data and answer questions.
-                </p>
-                <Button 
-                  type="primary" 
-                  style={{ 
-                    marginTop: '16px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    border: 'none'
-                  }}
-                  disabled
-                >
-                  Coming Soon
-                </Button>
+                overflow: 'hidden'
+              }}>
+                {/* Messages Area */}
+                <div style={{ 
+                  flex: 1, 
+                  overflowY: 'auto', 
+                  marginBottom: '16px',
+                  padding: '8px',
+                  background: '#fafafa',
+                  borderRadius: '8px',
+                  border: '1px solid #f0f0f0'
+                }}>
+                  {messages.length === 0 ? (
+                    <div style={{ 
+                      textAlign: 'center', 
+                      color: '#8c8c8c', 
+                      padding: '20px' 
+                    }}>
+                      <MessageOutlined style={{ fontSize: '32px', color: '#d9d9d9', marginBottom: '8px' }} />
+                      <div>Ask me about your Power BI data!</div>
+                      <div style={{ fontSize: '12px', marginTop: '8px' }}>
+                        Try: "total sales", "top products", or "dax: EVALUATE {'{1, 2, 3}'}"
+                      </div>
+                    </div>
+                  ) : (
+                    messages.map((msg) => (
+                      <div key={msg.id} style={{ 
+                        marginBottom: '12px',
+                        display: 'flex',
+                        justifyContent: msg.type === 'user' ? 'flex-end' : 'flex-start'
+                      }}>
+                        <div style={{
+                          maxWidth: '80%',
+                          padding: '8px 12px',
+                          borderRadius: '12px',
+                          background: msg.type === 'user' 
+                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                            : '#ffffff',
+                          color: msg.type === 'user' ? 'white' : '#333',
+                          border: msg.type === 'bot' ? '1px solid #f0f0f0' : 'none',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                          <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>
+                            {msg.timestamp}
+                          </div>
+                          <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px' }}>
+                            {msg.content}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {isLoading && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                      <div style={{
+                        padding: '8px 12px',
+                        borderRadius: '12px',
+                        background: '#ffffff',
+                        border: '1px solid #f0f0f0',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}>
+                        <Spin size="small" /> Thinking...
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input Area */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <Input
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    placeholder={isOnline ? "Ask about your data..." : "Chatbot offline"}
+                    disabled={!isOnline || isLoading}
+                    style={{ flex: 1 }}
+                  />
+                  <Button 
+                    type="primary" 
+                    icon={<SendOutlined />}
+                    onClick={sendMessage}
+                    disabled={!isOnline || isLoading || !inputValue.trim()}
+                    style={{ 
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      border: 'none'
+                    }}
+                  />
+                </div>
               </div>
             </Card>
           </Col>
