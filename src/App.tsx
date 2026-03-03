@@ -1,17 +1,23 @@
-import { Layout, Typography, Card, Space, Row, Col, Button, Avatar, Badge, Input, Spin, message } from 'antd';
-import { MessageOutlined, DashboardOutlined, SettingOutlined, BellOutlined, SendOutlined } from '@ant-design/icons';
+import { Layout, Typography, Card, Space, Row, Col, Button, Avatar, Badge, Input, Spin, message, Select } from 'antd';
+import { MessageOutlined, DashboardOutlined, SettingOutlined, BellOutlined, SendOutlined, BarChartOutlined, TableOutlined } from '@ant-design/icons';
 import { useState, useEffect, useRef } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import './App.css';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
+const { Option } = Select;
 
 interface ChatMessage {
   id: string;
   type: 'user' | 'bot';
   content: string;
   timestamp: string;
+  data?: any[];
+  chartType?: 'table' | 'bar' | 'pie' | 'line';
 }
+
+const COLORS = ['#667eea', '#764ba2', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
 function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -19,6 +25,108 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const detectChartType = (data: any[]): 'bar' | 'pie' | 'line' | 'table' => {
+    if (!data || data.length === 0) return 'table';
+    
+    const keys = Object.keys(data[0]);
+    const numericKeys = keys.filter(key => 
+      data.some(row => typeof row[key] === 'number')
+    );
+    
+    // If we have categories and numeric values, suggest bar or pie
+    if (keys.length >= 2 && numericKeys.length >= 1) {
+      const categoricalKeys = keys.filter(key => 
+        data.some(row => typeof row[key] === 'string')
+      );
+      
+      if (categoricalKeys.length >= 1 && data.length <= 10) {
+        return 'pie'; // Good for small categorical data
+      }
+      return 'bar'; // Good for comparisons
+    }
+    
+    return 'table'; // Default to table
+  };
+
+  const formatDataForChart = (data: any[], chartType: string) => {
+    if (!data) return [];
+    
+    if (chartType === 'pie') {
+      const keys = Object.keys(data[0]);
+      const nameKey = keys.find(key => typeof data[0][key] === 'string') || 'name';
+      const valueKey = keys.find(key => typeof data[0][key] === 'number') || 'value';
+      
+      return data.map(item => ({
+        name: item[nameKey],
+        value: item[valueKey]
+      }));
+    }
+    
+    return data;
+  };
+
+  const renderChart = (data: any[], chartType: string) => {
+    if (!data || data.length === 0) return null;
+    
+    const formattedData = formatDataForChart(data, chartType);
+    
+    switch (chartType) {
+      case 'bar':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={formattedData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey={Object.keys(formattedData[0]).find(k => typeof formattedData[0][k] === 'string')} />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey={Object.keys(formattedData[0]).find(k => typeof formattedData[0][k] === 'number')} fill="#667eea" />
+            </BarChart>
+          </ResponsiveContainer>
+        );
+        
+      case 'pie':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={formattedData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {formattedData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        );
+        
+      case 'line':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={formattedData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey={Object.keys(formattedData[0]).find(k => typeof formattedData[0][k] === 'string')} />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey={Object.keys(formattedData[0]).find(k => typeof formattedData[0][k] === 'number')} stroke="#667eea" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        );
+        
+      default:
+        return null;
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -69,11 +177,23 @@ function App() {
 
       if (response.ok) {
         const data = await response.json();
+        
+        // Extract structured data if available
+        let extractedData: any[] | undefined = undefined;
+        let chartType: 'table' | 'bar' | 'pie' | 'line' = 'table';
+        
+        if (data.has_data && data.data) {
+          extractedData = data.data;
+          chartType = detectChartType(data.data);
+        }
+        
         const botMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           type: 'bot',
           content: data.response,
-          timestamp: new Date().toLocaleTimeString()
+          timestamp: new Date().toLocaleTimeString(),
+          data: extractedData,
+          chartType: chartType
         };
         setMessages(prev => [...prev, botMessage]);
       } else {
@@ -170,7 +290,7 @@ function App() {
                 borderRadius: '8px',
                 background: '#f8f9fa'
               }}>
-             
+            <iframe title="testaudit" width="1140" height="541.25" src="https://app.powerbi.com/reportEmbed?reportId=6ac9f0dc-1c02-4339-b1aa-0ed86b91b49c&autoAuth=true&ctid=7af38bd4-da09-4cad-b870-0617a2df54d4" frameborder="0" allowFullScreen="true"/>
               </div>
             </Card>
           </Col>
@@ -255,6 +375,12 @@ function App() {
                           <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px' }}>
                             {msg.content}
                           </div>
+                          {/* Render chart if data is available */}
+                          {msg.data && msg.chartType && (
+                            <div style={{ marginTop: '12px' }}>
+                              {renderChart(msg.data, msg.chartType)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))
